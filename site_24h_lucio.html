@@ -1000,7 +1000,7 @@ function startGlobalListener(){
 }
 
 /* ═══════════ SCREENS ═══════════ */
-function showScreen(id){
+function showScreen(id, pushHistory=true){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   if(id==='adminScreen'){ isAdminConnected=true; renderAdmin(); }
@@ -1012,7 +1012,21 @@ function showScreen(id){
     startRemoteMusicListener();
     startPlayerSelectNotifListener();
   }
+  // Push state to browser history so Back button works
+  if(pushHistory){
+    history.pushState({screen: id}, '', '#'+id);
+  }
 }
+
+// Handle browser Back button
+window.addEventListener('popstate', function(e){
+  if(e.state && e.state.screen){
+    showScreen(e.state.screen, false);
+  } else {
+    // No previous state — go to welcome screen
+    showScreen('welcomeScreen', false);
+  }
+});
 async function checkAdminCardVisibility(){
   const session = await fbGet('adminSession');
   const myToken = getAdminToken();
@@ -2719,6 +2733,44 @@ window.askPlayerPin=askPlayerPin;
 window.checkPlayerPin=checkPlayerPin;
 
 window.addEventListener('load',init);
+
+// Fix: when screen wakes up from sleep, re-sync casino state and play missed sounds
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible'){
+    if(DB){
+      const prevCasino = DB.casinoEnabled;
+      fbGet('').then(data => {
+        if(!data) return;
+        DB = data;
+        if(!DB.demonOpts) DB.demonOpts = JSON.parse(JSON.stringify(DEFAULT_DEMON_OPTS));
+        if(!DB.brainrotOpts) DB.brainrotOpts = JSON.parse(JSON.stringify(DEFAULT_BRAINROT_OPTS));
+        const activeScreen = document.querySelector('.screen.active')?.id;
+        // If casino opened while screen was off, play sound + banner now
+        if(DB.casinoEnabled && !prevCasino){
+          playCasinoOpenSound();
+          showCasinoOpenBanner();
+          sendPushNotif('🎰 Casino ouvert !', 'Le casino est maintenant accessible. Allez-y !');
+        }
+        // Re-render current screen
+        if(activeScreen === 'playerScreen' && currentPlayer !== null){
+          refreshPlayerData();
+          renderCasinoTab();
+          renderShopTab();
+          checkShareRequests();
+          checkAdminMessages();
+        }
+        if(activeScreen === 'playerSelectScreen') renderPlayerSelect();
+        if(activeScreen === 'adminScreen'){
+          renderAdmin();
+          const tog = document.getElementById('casinoToggle');
+          if(tog) tog.checked = !!DB.casinoEnabled;
+        }
+        // Restart listener in case it dropped during sleep
+        startGlobalListener();
+      }).catch(()=>{});
+    }
+  }
+});
 </script>
 </body>
 </html>
