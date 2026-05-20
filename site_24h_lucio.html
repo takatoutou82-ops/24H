@@ -883,7 +883,16 @@ async function attemptConnect(){
       if(!DB.brainrotOpts) DB.brainrotOpts=JSON.parse(JSON.stringify(DEFAULT_BRAINROT_OPTS));
       if(!DB.bonuses){ DB.bonuses={}; BONUS_CATALOG.forEach(b=>{ DB.bonuses[b.id]={...b,active:true}; }); }
       startGlobalListener();
-      showScreen('welcomeScreen');
+      // Si cet appareil a la session admin, le remettre directement en admin
+      const myToken = getAdminToken();
+      if(data.adminSession && data.adminSession.token === myToken){
+        isAdminConnected = true;
+        await fbSet('adminSession', {token: myToken, ts: Date.now()});
+        startAdminSessionPing();
+        showScreen('adminScreen');
+      } else {
+        showScreen('welcomeScreen');
+      }
     } else {
       showScreen('setupScreen');
     }
@@ -1161,8 +1170,18 @@ window.forceReleaseAdminSession=async function(){
   const code = prompt('Code secret pour forcer la libération :');
   if(code !== 'mylannlegoat18'){ showToast('Code incorrect !', true); return; }
   await fbSet('adminSession',null);
+  isAdminConnected = false;
+  if(adminPingInterval){ clearInterval(adminPingInterval); adminPingInterval=null; }
   showToast('Session libérée. Un autre appareil peut se connecter.');
 }
+
+// Ctrl+P depuis n'importe quel écran = libérer session admin
+document.addEventListener('keydown', function(e){
+  if(e.ctrlKey && e.key.toLowerCase() === 'p'){
+    e.preventDefault();
+    window.forceReleaseAdminSession();
+  }
+});
 
 /* ═══════════ PLAYER SELECT ═══════════ */
 function countPlayerNotifs(i){
