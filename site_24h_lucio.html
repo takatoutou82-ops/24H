@@ -2659,7 +2659,7 @@ function loadImgFile(input){
 window.loadImgFile = loadImgFile;
 
 async function remoteImgShow(){
-  if(!remoteImgData){ showToast('Choisissez une image d'abord !', true); return; }
+  if(!remoteImgData){ showToast("Choisissez une image d'abord !", true); return; }
   await fbSet('remoteImage', {action:'show', data: remoteImgData, ts: Date.now()});
   document.getElementById('imgStatus').textContent = '✅ Image affichée sur les appareils joueurs.';
 }
